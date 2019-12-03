@@ -6,6 +6,8 @@
 #include <poll.h>
 #include <climits>
 #include <cstring>
+#include <fstream>
+#include <sstream>
 
 #include <X11/extensions/Xrandr.h>
 #include <X11/Xatom.h>
@@ -361,6 +363,13 @@ int main(int argc, char *argv[])
         std::exit(-1);
         break;
     }
+  }
+
+  {
+    std::stringstream ss;
+    ss << getenv("HOME") << "/.sys-monitor.pid";
+    std::ofstream fout(ss.str());
+    fout << getpid();
   }
 
   MainLoop _;
