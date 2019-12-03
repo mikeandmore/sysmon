@@ -8,6 +8,7 @@
 #include <cstring>
 
 #include <X11/extensions/Xrandr.h>
+#include <X11/Xatom.h>
 
 #include "monitor.h"
 
@@ -61,6 +62,60 @@ Pixmap Bar::LoadBitmap(const uint8_t *data, unsigned int width, unsigned int hei
   return XCreateBitmapFromData(dpy, w, (char *) data, width, height);
 }
 
+Window Bar::CreateWindow(int x, int y, int width, int height)
+{
+  XSetWindowAttributes attr;
+  attr.background_pixel = 0;
+  attr.event_mask = ExposureMask;
+  attr.override_redirect = 1;
+
+  auto w = XCreateWindow(
+      dpy, XDefaultRootWindow(dpy), x, y, width, height, 0,
+      CopyFromParent, CopyFromParent, CopyFromParent,
+      CWBackPixel | CWEventMask, &attr);
+
+  Atom props[] = {
+    XInternAtom(dpy, "_NET_WM_WINDOW_TYPE_DOCK", 0),
+  };
+
+  XChangeProperty(
+      dpy, w,
+      XInternAtom(dpy, "_NET_WM_WINDOW_TYPE", 0), XA_ATOM, 32,
+      PropModeAppend, (unsigned char *) props, sizeof(props) / sizeof(Atom));
+
+  unsigned long mwm_decor[] = {
+    0x02, 0, 0, 0, 0
+  };
+
+  Atom mwm = XInternAtom(dpy, "_MOTIF_WM_HINTS", 0);
+
+  XChangeProperty(
+      dpy, w,
+      mwm, mwm, 32,
+      PropModeReplace, (unsigned char *) mwm_decor, 5);
+
+  unsigned long struts[] = {
+    0, 0, 0, 0,
+  };
+
+  if (g_screen_top)
+    struts[2] = 18;
+  else
+    struts[3] = 18;
+
+  XChangeProperty(
+      dpy, w,
+      XInternAtom(dpy, "_NET_WM_STRUT", 0), XA_CARDINAL, 32,
+      PropModeReplace, (unsigned char *) struts, 4);
+
+  XSizeHints hints;
+  memset(&hints, 0, sizeof(XSizeHints));
+  hints.flags |= PPosition | PSize | PBaseSize;
+  XSetWMNormalHints(dpy, w, &hints);
+
+  return w;
+}
+
 void Bar::Configure()
 {
   for (auto c: ctxs) {
@@ -74,24 +129,20 @@ void Bar::Configure()
   XRRScreenResources *sres =
       XRRGetScreenResources(dpy, XDefaultRootWindow(dpy));
 
-  XSetWindowAttributes attr;
-  attr.background_pixel = 0;
-  attr.event_mask = ExposureMask;
-  attr.override_redirect = 1;
-
   XSetForeground(dpy, XDefaultGC(dpy, 0),
                  std::numeric_limits<unsigned long>::max());
   XSetBackground(dpy, XDefaultGC(dpy, 0), 0);
 
   std::vector<XRRCrtcInfo *> all_sinfo;
 
-  unsigned int max_h = 0;
+  int max_h = 0, max_w = 0;
   for (int i = 0; i < sres->ncrtc; i++) {
     XRRCrtcInfo *sinfo = XRRGetCrtcInfo(dpy, sres, sres->crtcs[i]);
     if (sinfo == nullptr)
       continue;
     if (sinfo->noutput > 0) {
-      max_h = std::max(max_h, sinfo->height + sinfo->y);
+      max_w = std::max(max_w, (int) sinfo->width + sinfo->x);
+      max_h = std::max(max_h, (int) sinfo->height + sinfo->y);
       all_sinfo.push_back(sinfo);
     } else {
       XRRFreeCrtcInfo(sinfo);
@@ -103,10 +154,7 @@ void Bar::Configure()
         || (g_screen_top && sinfo->y == 0)
         || (!g_screen_top && sinfo->y + sinfo->height == max_h)) {
       int y = g_screen_top ? 0 : max_h - 18;
-      auto w = XCreateWindow(
-          dpy, XDefaultRootWindow(dpy), sinfo->x, y, sinfo->width, 18, 0,
-          CopyFromParent, CopyFromParent, CopyFromParent,
-          CWBackPixel | CWEventMask | CWOverrideRedirect, &attr);
+      auto w = CreateWindow(sinfo->x, y, sinfo->width, 18);
       XMapWindow(dpy, w);
       ctxs.push_back(new RenderContext(dpy, font, w, sinfo->width));
     }

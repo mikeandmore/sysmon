@@ -137,6 +137,8 @@ class Bar {
   XftFont *font;
   std::vector<RenderContext *> ctxs;
 
+  Window CreateWindow(int x, int y, int width, int height);
+
  public:
   static bool g_all_screens;
   static bool g_screen_top;
