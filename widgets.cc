@@ -485,7 +485,7 @@ class VolumeWidget : public Widget {
     bar->RegisterCommand(
         "vol-up",
         [=]() {
-          pa_cvolume_inc(&volume, PA_VOLUME_NORM / 10);
+          pa_cvolume_inc_clamp(&volume, PA_VOLUME_NORM / 10, PA_VOLUME_NORM);
           SetVolume();
         });
     bar->RegisterCommand(
