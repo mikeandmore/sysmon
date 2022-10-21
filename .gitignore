@@ -1,0 +1,3 @@
+*.o
+sysmon
+.ccls-cache/
