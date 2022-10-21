@@ -5,6 +5,7 @@
 #include <unistd.h>
 #include <poll.h>
 #include <climits>
+#include <cmath>
 #include <cstring>
 #include <fstream>
 #include <sstream>
@@ -16,12 +17,14 @@
 
 namespace sysmon {
 
+double RenderContext::g_dpi_scale = 1.0;
+
 long RenderContext::Translate(Widget *w, long offset)
 {
   if (w->align.type == AlignmentType::Left) {
-    return w->align.pos + offset;
+    return std::lrint((w->align.pos + offset) * g_dpi_scale);
   } else if (w->align.type == AlignmentType::Right) {
-    return window_length - w->align.pos - w->Width() + offset;
+    return std::lrint(window_length - g_dpi_scale * (w->align.pos + w->Width()) + g_dpi_scale * offset);
   } else {
     abort();
   }
@@ -30,21 +33,22 @@ long RenderContext::Translate(Widget *w, long offset)
 RenderContext *RenderContext::DrawText(Widget *w, std::string str, long offset)
 {
   XftDrawStringUtf8(draw, &color, font,
-                    Translate(w, offset), 14,
+                    Translate(w, offset), std::lrint(0.75 * Bar::g_height),
                     (const FcChar8 *) str.c_str(), str.length());
   return this;
 }
 
 RenderContext *RenderContext::DrawBlock(Widget *w, long offset, size_t length)
 {
-  XftDrawRect(draw, &color, Translate(w, offset), 4, length, 10);
+  XftDrawRect(draw, &color, Translate(w, offset), std::lrint(0.25 * Bar::g_height),
+              std::lrint(g_dpi_scale * length), std::lrint(0.5 * Bar::g_height));
   return this;
 }
 
 RenderContext *RenderContext::DrawBitmap(Widget *w, Pixmap bitmap, size_t width, size_t height, long offset)
 {
   XCopyPlane(dpy, bitmap, win, XDefaultGC(dpy, 0), 0, 0, width, height,
-             Translate(w, offset), (18 - height) / 2, 1);
+             Translate(w, offset), (Bar::g_height - height) / 2, 1);
   return this;
 }
 
@@ -101,9 +105,9 @@ Window Bar::CreateWindow(int x, int y, int width, int height)
   };
 
   if (g_screen_top)
-    struts[2] = 18;
+    struts[2] = height;
   else
-    struts[3] = 18;
+    struts[3] = height;
 
   XChangeProperty(
       dpy, w,
@@ -155,8 +159,8 @@ void Bar::Configure()
     if (g_all_screens
         || (g_screen_top && sinfo->y == 0)
         || (!g_screen_top && sinfo->y + sinfo->height == max_h)) {
-      int y = g_screen_top ? 0 : max_h - 18;
-      auto w = CreateWindow(sinfo->x, y, sinfo->width, 18);
+      int y = g_screen_top ? 0 : max_h - g_height;
+      auto w = CreateWindow(sinfo->x, y, sinfo->width, g_height);
       XMapWindow(dpy, w);
       ctxs.push_back(new RenderContext(dpy, font, w, sinfo->width));
     }
@@ -343,6 +347,7 @@ void MainLoop::Run(Bar *bar)
 
 bool Bar::g_all_screens = false;
 bool Bar::g_screen_top = true;
+int Bar::g_height = 16;
 
 }
 
@@ -373,6 +378,15 @@ int main(int argc, char *argv[])
   }
 
   MainLoop _;
+
+  const char *dpi_res = XGetDefault(_.display(), "Xft", "dpi");
+  if (dpi_res) {
+    int dpi = std::atoi(dpi_res);
+    if (dpi > 0) {
+      RenderContext::g_dpi_scale = dpi / 96.;
+      Bar::g_height *= RenderContext::g_dpi_scale;
+    }
+  }
   Bar *bar = new Bar(_.display());
 
   bar->Add(Factory<Widget, CpuKind>::Construct(), AlignmentType::Left);

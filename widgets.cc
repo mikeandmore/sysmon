@@ -220,7 +220,7 @@ class MemoryWidget : public Widget, public StringUtils {
         ->DrawBlock(this, 16, p)
         ->SetColor(0x74 << 8, 0xD3 << 8, 0x71 << 8)
         ->DrawBlock(this, 16 + p, q)
-        ->SetColor(0xDD << 8, 0xDD << 8, 0xDD << 8)
+        ->SetColor(0x99 << 8, 0x99 << 8, 0x99 << 8)
         ->DrawBlock(this, 16 + p + q, r);
 
     ctx->ResetColor();
@@ -347,7 +347,7 @@ class BacklightWidget : public Widget, public DeviceUtil, public StringUtils {
         ->DrawBitmap(this, backlight_icon, 9, 9, 4)
         ->SetColor(0xFF << 8, 0xFF << 8, 0xFF << 8)
         ->DrawBlock(this, 16, pct)
-        ->SetColor(0xDD << 8, 0xDD << 8, 0xDD << 8)
+        ->SetColor(0x99 << 8, 0x99 << 8, 0x99 << 8)
         ->DrawBlock(this, 16 + pct, 100 - pct)
         ->ResetColor();
   }
@@ -415,6 +415,7 @@ class VolumeWidget : public Widget {
   pa_mainloop *loop;
   pa_context *ctx;
   Pixmap speaker_icon;
+  std::vector<int> sinks;
 
  public:
   VolumeWidget() {
@@ -442,15 +443,19 @@ class VolumeWidget : public Widget {
     Refresh();
   }
   void Refresh() override final {
-    auto o = pa_context_get_sink_info_by_index(
-        ctx, 0,
+    // TODO: What to display if there are multiple sinks?
+    sinks.clear();
+    auto o = pa_context_get_sink_info_list(
+        ctx,
         [](pa_context *c, const pa_sink_info *sink, int eol, void *ptr) {
-          auto w = (VolumeWidget *) ptr;
           if (sink == nullptr) {
             return;
           }
+          auto w = (VolumeWidget *) ptr;
           w->volume = sink->volume;
           w->enabled = true;
+          // printf("%s\n", sink->name);
+          w->sinks.push_back(sink->index);
         }, this);
 
     if (!o) {
@@ -466,18 +471,19 @@ class VolumeWidget : public Widget {
   void SetVolume() {
     if (!enabled) return;
 
-    auto o = pa_context_set_sink_volume_by_index(
-        ctx, 0, &volume,
-        [](pa_context *ctx, int success, void *ptr) {
-        }, this);
+    for (auto sink_id: sinks) {
+      auto o = pa_context_set_sink_volume_by_index(
+          ctx, sink_id, &volume,
+          [](pa_context *ctx, int success, void *ptr) {}, this);
 
-    if (!o)
-      return;
-    while (pa_operation_get_state(o) == PA_OPERATION_RUNNING) {
-      int ret;
-      pa_mainloop_iterate(loop, 1, &ret);
+      if (!o)
+        return;
+      while (pa_operation_get_state(o) == PA_OPERATION_RUNNING) {
+        int ret;
+        pa_mainloop_iterate(loop, 1, &ret);
+      }
+      pa_operation_unref(o);
     }
-    pa_operation_unref(o);
   }
 
   void OnAdd(Bar *bar) override final {
@@ -510,7 +516,7 @@ class VolumeWidget : public Widget {
         ->DrawBitmap(this, speaker_icon, 8, 8, 4)
         ->SetColor(0xFF << 8, 0xFF << 8, 0xFF << 8)
         ->DrawBlock(this, 16, pct)
-        ->SetColor(0xDD << 8, 0xDD << 8, 0xDD << 8)
+        ->SetColor(0x99 << 8, 0x99 << 8, 0x99 << 8)
         ->DrawBlock(this, 16 + pct, 100 - pct)
         ->ResetColor();
   }

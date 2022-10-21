@@ -87,6 +87,7 @@ class RenderContext {
     XftDrawDestroy(draw);
   }
  public:
+  static double g_dpi_scale;
   long Translate(Widget *, long offset);
   RenderContext *DrawText(Widget *, std::string str, long offset = 0);
   RenderContext *DrawBlock(Widget *, long offset, size_t length);
@@ -142,6 +143,7 @@ class Bar {
  public:
   static bool g_all_screens;
   static bool g_screen_top;
+  static int g_height;
   Bar(Display *dpy);
   void Configure();
   void Add(Widget *widget, AlignmentType type);
