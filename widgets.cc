@@ -42,7 +42,7 @@ class DeviceUtil {
     std::ifstream fin(path.str());
     std::vector<uint64_t> res;
     if (!fin) {
-      std::cerr << "Failed reading " << path.str() << std::endl;
+      // std::cerr << "Failed reading " << path.str() << std::endl;
       return res;
     }
     uint64_t n;
@@ -523,5 +523,43 @@ class VolumeWidget : public Widget {
 };
 
 template <> Widget *Factory<Widget, VolumeKind>::Construct() { return new VolumeWidget(); }
+
+class BatteryWidget : public Widget, public DeviceUtil {
+  std::vector<std::string> bat_devs;
+  uint64_t tot_full;
+  uint64_t tot_now;
+  Pixmap battery_icon;
+ public:
+  BatteryWidget() : tot_full(0), tot_now(0) {
+    bat_devs = ListDevices("power_supply");
+    for (const auto &bat_dev: bat_devs) {
+      auto stats = ReadStat("power_supply", bat_dev, "energy_full");
+      if (stats.size() == 0) continue;
+      tot_full += stats[0];
+    }
+  }
+  void Refresh() final override {
+    tot_now = 0;
+    for (const auto &bat_dev: bat_devs) {
+      auto stats = ReadStat("power_supply", bat_dev, "energy_now");
+      if (stats.size() == 0) continue;
+      tot_now += stats[0];
+    }
+  }
+  size_t Width() final override { return 64; }
+  void Render(RenderContext *ctx) final override {
+    if (bat_devs.size() == 0) return;
+    int pct = 100ULL * tot_now / tot_full;
+    ctx
+        ->DrawBitmap(this, battery_icon, 16, 16, 4)
+        ->DrawText(this, std::to_string(pct) + "%", 20)
+        ->ResetColor();
+  }
+  void OnAdd(Bar *bar) final override {
+    battery_icon = bar->LoadBitmap(icons::battery_bits, 16, 16);
+  }
+};
+
+template <> Widget *Factory<Widget, BatteryKind>::Construct() { return new BatteryWidget(); }
 
 }

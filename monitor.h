@@ -65,6 +65,7 @@ enum WidgetKind : int {
   BacklightKind,
   VolumeKind,
   TimeKind,
+  BatteryKind,
 };
 
 class Widget;

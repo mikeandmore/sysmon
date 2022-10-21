@@ -394,6 +394,7 @@ int main(int argc, char *argv[])
   bar->Add(Factory<Widget, VolumeKind>::Construct(), AlignmentType::Right);
   bar->Add(Factory<Widget, BacklightKind>::Construct(), AlignmentType::Right);
   bar->Add(Factory<Widget, MemoryKind>::Construct(), AlignmentType::Right);
+  bar->Add(Factory<Widget, BatteryKind>::Construct(), AlignmentType::Right);
   bar->Add(Factory<Widget, NetworkKind>::Construct(), AlignmentType::Right);
   bar->Add(Factory<Widget, StorageKind>::Construct(), AlignmentType::Right);
   bar->Configure();

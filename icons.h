@@ -11,6 +11,7 @@ namespace icons {
 #include "net-down.xbm"
 #include "net-up.xbm"
 #include "speaker.xbm"
+#include "battery.xbm"
 }
 
 #endif
